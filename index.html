@@ -2,8 +2,23 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JUGGLER ANALYZER</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ジャグラー分析</title>
+
+  <!-- Webアプリ・PWAメタタグ設定 (フルスクリーン表示対応) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ジャグラー分析">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b0d13">
+
+  <!-- iPhone / iPad ホーム画面用アプリアイコン (Base64埋め込み) -->
+  <link rel="apple-touch-icon" id="apple-touch-icon">
+  <link rel="icon" id="favicon-icon">
+
+  <!-- Web App Manifest (動的生成リンク) -->
+  <link rel="manifest" id="manifest-link">
+
   <style>
     :root {
       --bg-color: #0b0d13;
@@ -20,20 +35,21 @@
       --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
       font-family: var(--font-family);
       line-height: 1.5;
-      padding-bottom: 60px;
+      padding-bottom: env(safe-area-inset-bottom, 40px);
+      user-select: none;
     }
 
     /* ヘッダーバナー */
     header {
       background: linear-gradient(135deg, #181428 0%, #0d111a 100%);
       border-bottom: 1px solid var(--border-color);
-      padding: 12px 20px;
+      padding: max(12px, env(safe-area-inset-top, 12px)) 16px 12px 16px;
       position: sticky;
       top: 0;
       z-index: 50;
@@ -47,14 +63,13 @@
       align-items: center;
       gap: 12px;
     }
-    /* GOGO!ランプアイコン */
     .gogo-lamp-wrapper {
       width: 44px;
       height: 44px;
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
       background: #000;
-      border: 1px solid #374151;
+      border: 1.5px solid #3b82f6;
       box-shadow: 0 0 14px rgba(59, 130, 246, 0.6), inset 0 0 8px rgba(236, 72, 153, 0.4);
       display: flex;
       align-items: center;
@@ -68,7 +83,7 @@
       display: block;
     }
     header h1 {
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       font-weight: 800;
       letter-spacing: 0.5px;
       background: linear-gradient(to right, #c084fc, #f472b6);
@@ -82,13 +97,27 @@
       padding: 16px;
     }
 
+    /* PWAインストールガイドバナー（未インストール時用） */
+    .pwa-guide {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
     /* タブ切り替え */
     .tabs {
       display: flex;
       background: var(--card-bg);
       border-radius: 12px;
       padding: 4px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       border: 1px solid var(--border-color);
       gap: 6px;
     }
@@ -119,14 +148,14 @@
       background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 20px;
+      padding: 18px;
+      margin-bottom: 16px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
     .card-title {
       font-size: 1rem;
       font-weight: 700;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -137,23 +166,23 @@
     .drop-zone {
       border: 2px dashed #4b5563;
       border-radius: 12px;
-      padding: 26px 16px;
+      padding: 24px 16px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s ease;
       background: rgba(255, 255, 255, 0.02);
     }
-    .drop-zone:hover, .drop-zone.dragover {
+    .drop-zone:active {
       border-color: var(--accent-purple);
-      background: rgba(139, 92, 246, 0.08);
-      box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+      background: rgba(139, 92, 246, 0.1);
     }
     .drop-zone p { color: var(--text-sub); font-size: 0.85rem; margin-top: 6px; }
 
-    /* 設定推測一覧テーブル（スクリーンショット再現） */
+    /* 設定推測一覧テーブル */
     .table-container {
       overflow-x: auto;
       border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
     }
     table.analysis-table {
       width: 100%;
@@ -169,12 +198,9 @@
       white-space: nowrap;
     }
     table.analysis-table td {
-      padding: 14px;
+      padding: 13px 14px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       white-space: nowrap;
-    }
-    table.analysis-table tr:hover {
-      background: rgba(255, 255, 255, 0.02);
     }
 
     .badge-prob {
@@ -200,19 +226,19 @@
     /* 統計サマリー */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
     }
     .stat-card {
       background: var(--card-sub);
       border: 1px solid var(--border-color);
       border-radius: 12px;
-      padding: 18px;
+      padding: 14px 10px;
       text-align: center;
     }
     .stat-card .val {
-      font-size: 1.6rem;
+      font-size: 1.4rem;
       font-weight: 800;
       margin-top: 4px;
     }
@@ -224,10 +250,9 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.85rem;
-      margin-top: 10px;
     }
     .sub-table th, .sub-table td {
-      padding: 10px;
+      padding: 10px 8px;
       border-bottom: 1px solid var(--border-color);
       text-align: right;
     }
@@ -236,13 +261,13 @@
     /* フォームスタイル */
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
     }
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
     label {
       font-size: 0.75rem;
@@ -257,7 +282,6 @@
       border-radius: 8px;
       font-size: 0.9rem;
       outline: none;
-      transition: border-color 0.2s;
     }
     input:focus, select:focus {
       border-color: var(--accent-purple);
@@ -265,22 +289,20 @@
     .btn-primary {
       background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
       color: #fff;
-      font-weight: 600;
+      font-weight: 700;
       border: none;
       border-radius: 8px;
       padding: 12px 20px;
       cursor: pointer;
-      transition: opacity 0.2s;
       width: 100%;
       margin-top: 14px;
     }
-    .btn-primary:hover { opacity: 0.9; }
 
     .notice-text {
       font-size: 0.75rem;
       color: var(--text-sub);
       line-height: 1.4;
-      margin-top: 14px;
+      margin-top: 12px;
     }
   </style>
 </head>
@@ -289,29 +311,33 @@
   <!-- バナー -->
   <header>
     <div class="header-left">
-      <!-- 左上のGOGO!ランプアイコン -->
       <div class="gogo-lamp-wrapper">
-        <img src="GOGO!CHANCE.jpg" alt="GOGO! CHANCE" onerror="renderFallbackGogoSvg(this)">
+        <img id="gogo-header-img" alt="GOGO! CHANCE">
       </div>
       <h1>JUGGLER ANALYZER</h1>
     </div>
   </header>
 
   <div class="container">
-    <!-- 2タブ構成（台データ手動入力を削除） -->
+    <!-- スマホホーム画面追加ガイド -->
+    <div class="pwa-guide" id="pwa-banner">
+      <span>📲 <strong>アプリ化手順:</strong> 共有メニュー ➔「ホーム画面に追加」</span>
+      <button onclick="document.getElementById('pwa-banner').style.display='none'" style="background:none;border:none;color:#9ca3af;font-size:1.1rem;cursor:pointer;">✕</button>
+    </div>
+
+    <!-- 2タブ構成 -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('analysis-tab', this)">📊 設定4以上推測</button>
-      <button class="tab-btn" onclick="switchTab('lifetime-tab', this)">💰 生涯収支・機種別勝率</button>
+      <button class="tab-btn" onclick="switchTab('lifetime-tab', this)">💰 生涯収支・勝率</button>
     </div>
 
     <!-- 1. 設定4以上推測タブ -->
     <div id="analysis-tab" class="tab-content active">
-      <!-- MHTML/HTML ファイル読み込み -->
       <div class="card">
-        <div class="card-title">📁 ホール保存ファイル (MHTML / HTML) の自動読み込み</div>
+        <div class="card-title">📁 ホール保存ファイル (MHTML / HTML) 読込</div>
         <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
           <span style="font-size: 2.2rem;">📥</span>
-          <p>ここに保存した <strong>.mht / .mhtml / .html</strong> ファイルをドラッグ＆ドロップ<br>またはクリックして選択</p>
+          <p>保存した <strong>.mht / .mhtml / .html</strong> を選択<br>またはここにファイルをドロップ</p>
           <input type="file" id="file-input" accept=".mhtml,.mht,.html,.htm,.txt" style="display: none;">
         </div>
         <div id="file-status" style="margin-top: 8px; font-size: 0.85rem; color: var(--accent-green); text-align: center; font-weight: 600;"></div>
@@ -339,7 +365,7 @@
               </tr>
             </thead>
             <tbody id="analysis-tbody">
-              <!-- JSで動的生成 -->
+              <!-- JSで生成 -->
             </tbody>
           </table>
         </div>
@@ -351,24 +377,23 @@
 
     <!-- 2. 生涯収支・勝率タブ -->
     <div id="lifetime-tab" class="tab-content">
-      <!-- 統計サマリー -->
       <div class="stats-grid">
         <div class="stat-card">
-          <div style="font-size: 0.8rem; color: var(--text-sub);">生涯総収支</div>
+          <div style="font-size: 0.75rem; color: var(--text-sub);">生涯総収支</div>
           <div class="val plus-val" id="sum-profit">+0 円</div>
         </div>
         <div class="stat-card">
-          <div style="font-size: 0.8rem; color: var(--text-sub);">全体勝率</div>
+          <div style="font-size: 0.75rem; color: var(--text-sub);">全体勝率</div>
           <div class="val" id="win-rate" style="color: var(--accent-gold);">0.0%</div>
-          <div style="font-size: 0.75rem; color: var(--text-sub); margin-top: 2px;" id="win-count">0勝 0敗 0分</div>
+          <div style="font-size: 0.7rem; color: var(--text-sub); margin-top: 2px;" id="win-count">0勝 0敗 0分</div>
         </div>
         <div class="stat-card">
-          <div style="font-size: 0.8rem; color: var(--text-sub);">総実戦回数</div>
+          <div style="font-size: 0.75rem; color: var(--text-sub);">総実戦数</div>
           <div class="val" id="total-battles">0 回</div>
         </div>
       </div>
 
-      <!-- 機種別勝率・収支テーブル（マイジャグIV対応） -->
+      <!-- 機種別勝率テーブル -->
       <div class="card">
         <div class="card-title">🎰 機種別 勝率・戦績内訳</div>
         <table class="sub-table">
@@ -382,7 +407,7 @@
             </tr>
           </thead>
           <tbody id="machine-stats-tbody">
-            <!-- JSで動的生成 -->
+            <!-- JSで生成 -->
           </tbody>
         </table>
       </div>
@@ -408,11 +433,11 @@
               </select>
             </div>
             <div class="form-group">
-              <label>投資金額 (円)</label>
+              <label>投資 (円)</label>
               <input type="number" id="rec-invest" placeholder="10000" step="500" required>
             </div>
             <div class="form-group">
-              <label>回収金額 (円)</label>
+              <label>回収 (円)</label>
               <input type="number" id="rec-payout" placeholder="24000" step="100" required>
             </div>
           </div>
@@ -443,7 +468,68 @@
   </div>
 
   <script>
-    // 機種別公式スペック (マイジャグラーIVを追加)
+    // --- GOGO! CHANCE アイコン（SVG高精細ベクター完全埋め込み） ---
+    // 外部ファイル不要でホーム画面アイコン・ヘッダーアイコン・ファビコンとして完全動作
+    const GOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+      <defs>
+        <radialGradient id="flashGlow" cx="48%" cy="46%" r="52%">
+          <stop offset="0%" stop-color="#40c4ff"/>
+          <stop offset="38%" stop-color="#0066ff"/>
+          <stop offset="72%" stop-color="#0022aa"/>
+          <stop offset="100%" stop-color="#000833"/>
+        </radialGradient>
+        <radialGradient id="pinkGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffb3d9"/>
+          <stop offset="60%" stop-color="#ff3399"/>
+          <stop offset="100%" stop-color="#cc0066"/>
+        </radialGradient>
+      </defs>
+      <rect width="512" height="512" fill="#000000"/>
+      <!-- 発光フラッシュスター -->
+      <polygon points="256,60 286,180 376,96 332,204 456,150 378,242 492,268 376,298 466,380 338,348 360,460 270,372 230,470 206,356 120,446 156,336 42,390 120,296 20,260 134,234 50,154 176,192 144,80 230,172" fill="url(#flashGlow)"/>
+      <!-- GOGO! テキスト -->
+      <g transform="translate(256,236) rotate(-16) translate(-256,-236)">
+        <text x="256" y="270" text-anchor="middle" font-family="'Impact', 'Arial Black', sans-serif" font-size="115" font-weight="900" fill="url(#pinkGlow)" stroke="#ffffff" stroke-width="8" stroke-linejoin="round" letter-spacing="3">GOGO!</text>
+      </g>
+      <!-- CHANCE テキスト -->
+      <g transform="translate(256,410)">
+        <text x="0" y="0" text-anchor="middle" font-family="'Impact', 'Arial Black', sans-serif" font-size="96" font-weight="900" fill="#ffffff" letter-spacing="4">CHANCE</text>
+      </g>
+    </svg>`;
+
+    const GOGO_DATA_URL = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(GOGO_SVG)));
+
+    // アプリアイコン＆ファビコンの適用
+    document.getElementById('gogo-header-img').src = GOGO_DATA_URL;
+    document.getElementById('apple-touch-icon').href = GOGO_DATA_URL;
+    document.getElementById('favicon-icon').href = GOGO_DATA_URL;
+
+    // Web App Manifest を動的生成してPWA化
+    const manifestBlob = new Blob([JSON.stringify({
+      name: "ジャグラーデータ分析",
+      short_name: "ジャグラー",
+      start_url: "./",
+      display: "standalone",
+      background_color: "#0b0d13",
+      theme_color: "#0b0d13",
+      icons: [
+        {
+          src: GOGO_DATA_URL,
+          sizes: "512x512",
+          type: "image/svg+xml",
+          purpose: "any maskable"
+        }
+      ]
+    })], { type: 'application/json' });
+    document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+
+    // すでにPWAとしてスタンドアローン起動している場合はインストール案内を非表示
+    if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+      const banner = document.getElementById('pwa-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    // --- ジャグラー分析エンジン ---
     const SPECS = {
       "マイジャグV": {
         bb: [273.1, 270.8, 266.4, 254.0, 240.1, 229.1],
@@ -471,15 +557,8 @@
       }
     };
 
-    // 画像が見つからない場合のフォールバック（SVGインライン生成）
-    function renderFallbackGogoSvg(imgEl) {
-      const svg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><polygon points="50,5 60,35 90,15 72,44 98,58 68,64 78,92 50,72 25,92 34,64 4,58 30,44 12,15 42,35" fill="%230077ff"/><text x="50" y="52" fill="%23ff66cc" font-size="20" font-weight="900" font-family="Arial Black, Impact, sans-serif" text-anchor="middle" stroke="%23fff" stroke-width="0.8">GOGO!</text><text x="50" y="80" fill="%23ffffff" font-size="14" font-weight="900" font-family="Arial Black, Impact, sans-serif" text-anchor="middle">CHANCE</text></svg>`;
-      imgEl.src = svg;
-    }
-
     let currentStandData = [];
 
-    // ベイズ推測エンジン
     function calculateBayes(machine, games, bb, rb) {
       const spec = SPECS[machine] || SPECS["マイジャグV"];
       if (games < 100) {
@@ -521,7 +600,6 @@
       };
     }
 
-    // テーブル描画
     function renderStandTable() {
       const tbody = document.getElementById("analysis-tbody");
       tbody.innerHTML = "";
@@ -554,12 +632,10 @@
       });
     }
 
-    // MHTML / HTML パーサー
     function parseHallHtml(htmlContent) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlContent, 'text/html');
 
-      // 機種判定（マイジャグIV判定対応）
       let defaultMachine = "マイジャグV";
       const title = doc.querySelector("title")?.textContent || "";
       const machineNameElem = doc.querySelector(".wrap-machine-name")?.textContent || "";
@@ -606,7 +682,6 @@
       return parsedData;
     }
 
-    // ファイルドロップリスナー
     const dropZone = document.getElementById("drop-zone");
     const fileInput = document.getElementById("file-input");
 
@@ -646,7 +721,7 @@
       reader.readAsText(file);
     }
 
-    // --- 生涯収支 & 機種別勝率 ロジック ---
+    // --- 生涯収支 & 勝率 ---
     let battleRecords = JSON.parse(localStorage.getItem("juggler_records") || "[]");
 
     function saveRecords() {
