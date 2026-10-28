@@ -160,6 +160,11 @@
       text-align: center;
       cursor: pointer;
       background: rgba(255, 255, 255, 0.02);
+      transition: all 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent-purple);
+      background: rgba(139, 92, 246, 0.08);
     }
     .drop-zone:active {
       border-color: var(--accent-purple);
@@ -167,9 +172,37 @@
     }
     .drop-zone p { color: var(--text-sub); font-size: 0.85rem; margin-top: 6px; }
 
+    /* 厳選フィルターボタン群 */
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .filter-chip {
+      background: var(--card-sub);
+      border: 1px solid var(--border-color);
+      color: var(--text-sub);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .filter-chip.active {
+      background: linear-gradient(135deg, var(--accent-pink), #e11d48);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(236, 72, 153, 0.4);
+    }
+
     .table-container {
       overflow-x: auto;
       border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
     }
     table.analysis-table {
       width: 100%;
@@ -273,6 +306,7 @@
 </head>
 <body>
 
+  <!-- バナー -->
   <header>
     <div class="header-left">
       <div class="gogo-lamp-wrapper">
@@ -288,6 +322,7 @@
       <button onclick="document.getElementById('pwa-banner').style.display='none'" style="background:none;border:none;color:#9ca3af;font-size:1.1rem;cursor:pointer;">✕</button>
     </div>
 
+    <!-- タブ切り替え -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('analysis-tab', this)">📊 設定4以上推測</button>
       <button class="tab-btn" onclick="switchTab('lifetime-tab', this)">💰 生涯収支・勝率</button>
@@ -296,11 +331,12 @@
     <!-- 1. 設定推測分析タブ -->
     <div id="analysis-tab" class="tab-content active">
       <div class="card">
-        <div class="card-title">📁 ホール保存ファイル (MHTML / HTML) 読込</div>
+        <div class="card-title">📁 ホール保存ファイル複数一括読込 (MHTML / HTML)</div>
         <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
           <span style="font-size: 2.2rem;">📥</span>
-          <p>保存した <strong>.mht / .mhtml / .html</strong> を選択<br>またはここにドロップ</p>
-          <input type="file" id="file-input" accept=".mhtml,.mht,.html,.htm,.txt" style="display: none;">
+          <p><strong>複数ファイル</strong>をまとめてドラッグ＆ドロップ<br>またはここをクリックして選択（複数選択対応）</p>
+          <!-- multiple属性で複数選択可能 -->
+          <input type="file" id="file-input" accept=".mhtml,.mht,.html,.htm,.txt" multiple style="display: none;">
         </div>
         <div id="file-status" style="margin-top: 8px; font-size: 0.85rem; color: var(--accent-green); text-align: center; font-weight: 600;"></div>
       </div>
@@ -308,7 +344,14 @@
       <div class="card">
         <div class="card-title" style="justify-content: space-between;">
           <span>設定4以上台一覧（番号順）</span>
-          <span id="data-count-badge" style="font-size: 0.8rem; color: var(--text-sub);">0台表示</span>
+          <span id="data-count-badge" style="font-size: 0.8rem; color: var(--text-sub);">厳選 0台表示</span>
+        </div>
+
+        <!-- 厳選フィルター切り替えスイッチ -->
+        <div class="filter-bar">
+          <button class="filter-chip active" id="filter-good" onclick="setFilterMode('good', this)">🔥 良台厳選 (60%以上・G数十分)</button>
+          <button class="filter-chip" id="filter-top" onclick="setFilterMode('top', this)">👑 鉄板のみ (80%以上)</button>
+          <button class="filter-chip" id="filter-all" onclick="setFilterMode('all', this)">📋 全台表示</button>
         </div>
 
         <div class="table-container">
@@ -329,7 +372,7 @@
           </table>
         </div>
         <p class="notice-text">
-          ※ 「設定4以上」および「予想順位」は各機種の公式ボーナス確率をもとに全設定均等配分を仮定したベイズ推測値モデルです。
+          ※ 複数ファイルを読み込んだ場合、全機種のデータを統合し、設定4以上濃厚な優秀台を横断して厳選表示します。
         </p>
       </div>
     </div>
@@ -352,20 +395,16 @@
         </div>
       </div>
 
-      <!-- 生涯収支日別推移グラフ -->
       <div class="card">
         <div class="card-title" style="justify-content: space-between;">
           <span>📈 生涯累計収支推移（日付別）</span>
           <span id="chart-subtext" style="font-size: 0.75rem; color: var(--text-sub);">同日の複数台は合算</span>
         </div>
         <div class="chart-box">
-          <svg id="profit-svg" class="svg-chart" viewBox="0 0 600 250">
-            <!-- JSで動的描画 -->
-          </svg>
+          <svg id="profit-svg" class="svg-chart" viewBox="0 0 600 250"></svg>
         </div>
       </div>
 
-      <!-- 機種別勝率テーブル -->
       <div class="card">
         <div class="card-title">🎰 機種別 勝率・戦績内訳</div>
         <table class="sub-table">
@@ -382,7 +421,6 @@
         </table>
       </div>
 
-      <!-- 実戦記録の登録 -->
       <div class="card">
         <div class="card-title">➕ 新規実戦結果の記録</div>
         <form id="record-form" onsubmit="handleRecordSubmit(event)">
@@ -415,7 +453,6 @@
         </form>
       </div>
 
-      <!-- 実戦履歴 -->
       <div class="card">
         <div class="card-title">📜 実戦履歴一覧</div>
         <table class="sub-table" style="font-size: 0.8rem;">
@@ -499,7 +536,6 @@
     }
 
     const gogoPngUrl = createGogoPngDataUrl();
-
     document.getElementById('gogo-header-img').src = gogoPngUrl;
     document.getElementById('apple-touch-icon').href = gogoPngUrl;
     document.getElementById('apple-touch-icon-precomposed').href = gogoPngUrl;
@@ -561,11 +597,19 @@
     };
 
     let currentStandData = [];
+    let filterMode = 'good'; // デフォルトで良台厳選
+
+    function setFilterMode(mode, btn) {
+      filterMode = mode;
+      document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderStandTable();
+    }
 
     function calculateBayes(machine, games, bb, rb) {
       const spec = SPECS[machine] || SPECS["マイジャグV"];
       if (games < 100) {
-        return { probGE4: 50.0, rankStr: "判定不能 (G数不足)" };
+        return { probGE4: 50.0, rankStr: "判定不能", isSampleShort: true };
       }
 
       let logPosteriors = [];
@@ -599,70 +643,151 @@
 
       return {
         probGE4: Math.min(99.9, Math.max(0.1, probGE4)),
-        rankStr: rankParts.join("")
+        rankStr: rankParts.join(""),
+        isSampleShort: games < 250
       };
     }
 
+    // テーブル描画（全ファイル統合後の厳選出力）
     function renderStandTable() {
       const tbody = document.getElementById("analysis-tbody");
       tbody.innerHTML = "";
-      document.getElementById("data-count-badge").innerText = `${currentStandData.length}台表示`;
 
-      currentStandData.sort((a, b) => a.rack - b.rack);
-
-      currentStandData.forEach(item => {
+      let analyzedList = currentStandData.map(item => {
         const est = calculateBayes(item.machine, item.games, item.bb, item.rb);
+        const totalBonus = item.bb + item.rb;
+        const totalProb = totalBonus > 0 ? (item.games / totalBonus) : 9999;
+        const rbProb = item.rb > 0 ? (item.games / item.rb) : 9999;
+        return { ...item, est, totalProb, rbProb };
+      });
+
+      let filtered = [];
+      if (filterMode === 'all') {
+        filtered = analyzedList;
+      } else if (filterMode === 'top') {
+        // 80%以上超厳選
+        filtered = analyzedList.filter(item => {
+          return item.games >= 300 && item.est.probGE4 >= 80.0;
+        });
+      } else {
+        // 'good' 良台厳選 (設定4以上60%以上 かつ RBまたは合算が優秀な台)
+        filtered = analyzedList.filter(item => {
+          if (item.games < 250) return false;
+          if (item.est.probGE4 < 60.0) return false;
+          return item.totalProb <= 155 || item.rbProb <= 330;
+        });
+      }
+
+      // 台番号昇順ソート（複数機種が混ざっても写真通り番号順で綺麗に整列）
+      filtered.sort((a, b) => a.rack - b.rack);
+
+      const countBadge = document.getElementById("data-count-badge");
+      if (filterMode === 'all') {
+        countBadge.innerText = `全 ${filtered.length}台表示`;
+      } else {
+        countBadge.innerText = `厳選 ${filtered.length}台表示 (全${currentStandData.length}台中)`;
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-sub); padding: 30px 10px;">条件に当てはまる優秀台がまだありません</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(item => {
         const tr = document.createElement("tr");
 
         let probClass = "badge-prob";
-        if (est.probGE4 >= 80) probClass += " high";
-        else if (est.probGE4 >= 60) probClass += " mid";
+        if (item.est.probGE4 >= 80) probClass += " high";
+        else if (item.est.probGE4 >= 60) probClass += " mid";
 
-        const probDisplay = (item.games < 200) ? "60%以上" : `${est.probGE4.toFixed(1)}%`;
-        const totalProb = (item.bb + item.rb > 0) ? `1/${(item.games / (item.bb + item.rb)).toFixed(1)}` : "-";
+        const probDisplay = item.est.isSampleShort ? "60%以上" : `${item.est.probGE4.toFixed(1)}%`;
+        const totalProbStr = (item.bb + item.rb > 0) ? `1/${item.totalProb.toFixed(1)}` : "-";
 
         tr.innerHTML = `
           <td style="font-weight: 700;">${item.rack}</td>
-          <td>${item.machine}</td>
+          <td><strong>${item.machine}</strong></td>
           <td><span class="${probClass}">${probDisplay}</span></td>
-          <td><span class="rank-text">${est.rankStr}</span></td>
+          <td><span class="rank-text">${item.est.rankStr}</span></td>
           <td>${item.games}</td>
           <td>${item.bb}</td>
           <td>${item.rb}</td>
-          <td style="color: var(--text-sub);">${totalProb}</td>
+          <td style="color: var(--text-sub);">${totalProbStr}</td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    function parseHallHtml(htmlContent) {
+    // --- 半角カナ正規化（ｱｲﾑ -> アイム 等） ---
+    function normalizeKana(str) {
+      if (!str) return "";
+      const map = {
+        'ｱ':'ア','ｲ':'イ','ｳ':'ウ','ｴ':'エ','ｵ':'オ',
+        'ｶ':'カ','ｷ':'キ','ｸ':'ク','ｹ':'ケ','ｺ':'コ',
+        'ｻ':'サ','ｼ':'シ','ｽ':'ス','ｾ':'セ','ｿ':'ソ',
+        'ﾀ':'タ','ﾁ':'チ','ﾂ':'ツ','ﾃ':'テ','ﾄ':'ト',
+        'ﾅ':'ナ','ﾆ':'ニ','ﾇ':'ヌ','ﾈ':'ネ','ﾉ':'ノ',
+        'ﾊ':'ハ','ﾋ':'ヒ','ﾌ':'フ','ﾍ':'ヘ','ﾎ':'ホ',
+        'ﾏ':'マ','ﾐ':'ミ','ﾑ':'ム','ﾒ':'メ','ﾓ':'モ',
+        'ﾔ':'ヤ','ﾕ':'ユ','ﾖ':'ヨ',
+        'ﾗ':'ラ','ﾘ':'リ','ﾙ':'ル','ﾚ':'レ','ﾛ':'ロ',
+        'ﾜ':'ワ','ｦ':'ヲ','ﾝ':'ン',
+        'ｧ':'ァ','ｨ':'ィ','ｩ':'ゥ','ｪ':'ェ','ｫ':'ォ',
+        'ｯ':'ッ','ｬ':'ャ','ｭ':'ュ','ｮ':'ョ',
+        'ｰ':'ー','ﾞ':'','ﾟ':''
+      };
+      // 濁点変換も含め正規化
+      let res = str.replace(/[ｱ-ﾝｧ-ｯｰﾞﾟ]/g, m => map[m] || m);
+      // 特殊な「ガ」「ギ」「グ」「ゲ」「ゴ」「ザ」「ジ」「ズ」「ゼ」「ゾ」等の濁点結合対応
+      res = res.replace(/カﾞ/g, 'ガ').replace(/キﾞ/g, 'ギ').replace(/クﾞ/g, 'グ').replace(/ケﾞ/g, 'ゲ').replace(/コﾞ/g, 'ゴ')
+               .replace(/サﾞ/g, 'ザ').replace(/シﾞ/g, 'ジ').replace(/スﾞ/g, 'ズ').replace(/セﾞ/g, 'ゼ').replace(/ソﾞ/g, 'ゾ')
+               .replace(/タﾞ/g, 'ダ').replace(/チﾞ/g, 'ヂ').replace(/ツﾞ/g, 'ヅ').replace(/テﾞ/g, 'デ').replace(/トﾞ/g, 'ド')
+               .replace(/ハﾞ/g, 'バ').replace(/ヒﾞ/g, 'ビ').replace(/フﾞ/g, 'ブ').replace(/ヘﾞ/g, 'ベ').replace(/ホﾞ/g, 'ボ');
+      return res;
+    }
+
+    // --- ホールHTML/MHTML 高精度機種判定パーサー ---
+    function parseHallHtml(htmlContent, fileName = "") {
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlContent, 'text/html');
 
-      let defaultMachine = "マイジャグV";
+      // 1. 各種メタデータ・テキストの収集とデコード
       const title = doc.querySelector("title")?.textContent || "";
       const machineNameElem = doc.querySelector(".wrap-machine-name")?.textContent || "";
-      const textAll = title + machineNameElem;
+      const breadcrumb = doc.querySelector(".breadcrumb, .p-breadcrumb")?.textContent || "";
+      const rawText = `${fileName} ${title} ${machineNameElem} ${breadcrumb}`;
 
-      if (textAll.includes("マイジャグラーIV") || textAll.includes("マイジャグ4") || textAll.includes("SﾏｲｼﾞｬｸﾞﾗｰⅣ") || textAll.includes("ﾏｲｼﾞｬｸﾞﾗｰ4")) {
-        defaultMachine = "マイジャグIV";
-      } else if (textAll.includes("マイジャグ") || textAll.includes("Sﾏｲｼﾞｬｸﾞﾗｰ")) {
-        defaultMachine = "マイジャグV";
-      } else if (textAll.includes("アイム") || textAll.includes("ネオアイム")) {
-        defaultMachine = "ネオアイム";
-      } else if (textAll.includes("ゴーゴー") || textAll.includes("Sｺﾞｰｺﾞｰ")) {
-        defaultMachine = "ゴーゴー3";
-      } else if (textAll.includes("ファンキー")) {
-        defaultMachine = "ファンキー2";
-      } else if (textAll.includes("ハッピー")) {
-        defaultMachine = "ハッピーV3";
+      // URLエンコードされている文字列（%EF%BD%...等）をデコード
+      let decodedText = rawText;
+      try {
+        decodedText = decodeURIComponent(rawText);
+      } catch (e) {}
+
+      // 半角カタカナを全角カタカナに正規化
+      const normalized = normalizeKana(decodedText) + " " + normalizeKana(htmlContent.slice(0, 5000));
+
+      // 2. 機種判定（ネオアイム・アイムを最優先・厳格に判定）
+      let detectedMachine = "マイジャグV";
+
+      if (normalized.includes("ネオアイム") || normalized.includes("アイムジャグラー") || normalized.includes("アイム") || normalized.includes("Sアイム")) {
+        detectedMachine = "ネオアイム";
+      } else if (normalized.includes("マイジャグラーIV") || normalized.includes("マイジャグ4") || normalized.includes("マイジャグラー4") || normalized.includes("SマイジャグラーIV") || normalized.includes("マイジャグIV")) {
+        detectedMachine = "マイジャグIV";
+      } else if (normalized.includes("マイジャグラーV") || normalized.includes("マイジャグ5") || normalized.includes("マイジャグラー5") || normalized.includes("マイジャグ") || normalized.includes("SマイジャグラーV")) {
+        detectedMachine = "マイジャグV";
+      } else if (normalized.includes("ゴーゴー") || normalized.includes("ゴーゴージャグラー") || normalized.includes("Sゴーゴー")) {
+        detectedMachine = "ゴーゴー3";
+      } else if (normalized.includes("ファンキー") || normalized.includes("ファンキージャグラー")) {
+        detectedMachine = "ファンキー2";
+      } else if (normalized.includes("ハッピー") || normalized.includes("ハッピージャグラー")) {
+        detectedMachine = "ハッピーV3";
       }
 
-      const rows = doc.querySelectorAll("table.standlist tbody tr");
+      // 3. テーブル解析
+      const rows = doc.querySelectorAll("table.standlist tbody tr, table.tablesorter tbody tr");
       const parsedData = [];
 
       rows.forEach(tr => {
-        const rackElem = tr.querySelector("td.sticky-column a, td.sticky-column");
+        const rackElem = tr.querySelector("td.sticky-column a, td.sticky-column, td:first-child a, td:first-child");
         const tds = tr.querySelectorAll("td");
         if (!rackElem || tds.length < 7) return;
 
@@ -674,7 +799,7 @@
         if (!isNaN(rack)) {
           parsedData.push({
             rack: rack,
-            machine: defaultMachine,
+            machine: detectedMachine,
             games: games,
             bb: bb,
             rb: rb
@@ -682,9 +807,10 @@
         }
       });
 
-      return parsedData;
+      return { machine: detectedMachine, list: parsedData };
     }
 
+    // --- 複数ファイル対応の読込処理 ---
     const dropZone = document.getElementById("drop-zone");
     const fileInput = document.getElementById("file-input");
 
@@ -701,30 +827,54 @@
       });
     });
     dropZone.addEventListener('drop', (e) => {
-      const files = e.dataTransfer.files;
-      if (files.length > 0) processFile(files[0]);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) processMultipleFiles(files);
     });
     fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) processFile(e.target.files[0]);
+      const files = Array.from(e.target.files);
+      if (files.length > 0) processMultipleFiles(files);
     });
 
-    function processFile(file) {
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        const content = evt.target.result;
-        const results = parseHallHtml(content);
-        if (results && results.length > 0) {
-          currentStandData = results;
-          renderStandTable();
-          document.getElementById("file-status").innerText = `✅ ${file.name} から ${results.length}台のデータを抽出・解析しました`;
-        } else {
-          document.getElementById("file-status").innerText = `⚠️ 台テーブルデータが見つかりませんでした。`;
+    // 複数ファイルを非同期で読み込んで合算
+    async function processMultipleFiles(files) {
+      let mergedData = [];
+      const machineLoadedCount = {};
+
+      for (const file of files) {
+        const text = await readFileAsText(file);
+        const res = parseHallHtml(text, file.name);
+        if (res.list && res.list.length > 0) {
+          mergedData = mergedData.concat(res.list);
+          machineLoadedCount[res.machine] = (machineLoadedCount[res.machine] || 0) + res.list.length;
         }
-      };
-      reader.readAsText(file);
+      }
+
+      if (mergedData.length > 0) {
+        // 重複する台番号（同一ファイルが再読込された場合など）を最新情報で上書きユニーク化
+        const rackMap = new Map();
+        mergedData.forEach(d => rackMap.set(`${d.machine}_${d.rack}`, d));
+        currentStandData = Array.from(rackMap.values());
+
+        renderStandTable();
+
+        const summaryStr = Object.entries(machineLoadedCount)
+          .map(([m, c]) => `${m} (${c}台)`).join(', ');
+        document.getElementById("file-status").innerText = `✅ ${files.length}個のファイルを読み込みました [${summaryStr}] ➔ 良台を厳選しました`;
+      } else {
+        document.getElementById("file-status").innerText = `⚠️ 台テーブルデータが見つかりませんでした。`;
+      }
     }
 
-    // --- 生涯収支 & 日付別プロットSVGグラフ ---
+    function readFileAsText(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve("");
+        reader.readAsText(file);
+      });
+    }
+
+    // --- 生涯収支 & 日別プロットSVGグラフ ---
     let battleRecords = JSON.parse(localStorage.getItem("juggler_records") || "[]");
 
     function saveRecords() {
@@ -830,7 +980,6 @@
       drawNativeSvgGraph();
     }
 
-    // --- 日付単位集計による生涯累計収支SVGグラフ描画 ---
     function drawNativeSvgGraph() {
       const svg = document.getElementById('profit-svg');
       if (!svg) return;
@@ -854,7 +1003,6 @@
         return;
       }
 
-      // 1. 日付ごとに収支を合算集計（同日複数台を1つに統合）
       const dailyMap = {};
       battleRecords.forEach(r => {
         const dateKey = r.date;
@@ -864,18 +1012,16 @@
         dailyMap[dateKey] += r.profit;
       });
 
-      // 2. 日付を昇順ソート（過去から現在へ）
       const sortedDates = Object.keys(dailyMap).sort();
 
-      // 3. 累計収支推移ポイントの生成
       let cumulative = 0;
-      const dataPoints = [0]; // 初期地点 (0円)
+      const dataPoints = [0];
       const dateLabels = ['START'];
 
       sortedDates.forEach(date => {
         cumulative += dailyMap[date];
         dataPoints.push(cumulative);
-        dateLabels.push(date.slice(5)); // 'YYYY-MM-DD' から 'MM-DD' を抽出
+        dateLabels.push(date.slice(5));
       });
 
       let maxVal = Math.max(...dataPoints);
@@ -910,7 +1056,6 @@
       const lastVal = dataPoints[dataPoints.length - 1];
       const strokeColor = lastVal >= 0 ? '#ec4899' : '#38bdf8';
 
-      // X軸の日付ラベル間引き間隔（プロット数が多い場合の重なり防止）
       const totalPoints = pts.length;
       let labelStep = 1;
       if (totalPoints > 15) labelStep = Math.ceil(totalPoints / 8);
@@ -933,35 +1078,27 @@
           </linearGradient>
         </defs>
 
-        <!-- 補助線 & 基準線 (0円) -->
         <line x1="${padLeft}" y1="${getY(maxVal)}" x2="${W-padRight}" y2="${getY(maxVal)}" stroke="#1f293d" stroke-width="1"/>
         <line x1="${padLeft}" y1="${getY(minVal)}" x2="${W-padRight}" y2="${getY(minVal)}" stroke="#1f293d" stroke-width="1"/>
         <line x1="${padLeft}" y1="${zeroY}" x2="${W-padRight}" y2="${zeroY}" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
 
-        <!-- Y軸目盛 -->
         <text x="${padLeft - 8}" y="${getY(maxVal) + 4}" fill="#9ca3af" font-size="10" text-anchor="end">${Math.round(maxVal).toLocaleString()}</text>
         <text x="${padLeft - 8}" y="${zeroY + 4}" fill="#9ca3af" font-size="10" font-weight="700" text-anchor="end">0</text>
         <text x="${padLeft - 8}" y="${getY(minVal) + 4}" fill="#9ca3af" font-size="10" text-anchor="end">${Math.round(minVal).toLocaleString()}</text>
 
-        <!-- X軸底辺ライン -->
         <line x1="${padLeft}" y1="${H - 32}" x2="${W-padRight}" y2="${H - 32}" stroke="#374151" stroke-width="1"/>
         ${xLabelsSvg}
 
-        <!-- 塗りつぶし領域 -->
         <path d="${areaD}" fill="url(#areaGrad)" />
-
-        <!-- 折れ線 -->
         <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
       `;
 
-      // ポイント点
       pts.forEach((p, i) => {
         if (pts.length <= 30 || i === 0 || i === pts.length - 1) {
           svgHtml += `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${strokeColor}" stroke="#ffffff" stroke-width="1.5"/>`;
         }
       });
 
-      // 最終累計値バッジ
       const lastPt = pts[pts.length - 1];
       const badgeText = `${lastVal >= 0 ? '+' : ''}${lastVal.toLocaleString()}円`;
       const badgeY = Math.max(padTop + 14, Math.min(H - padBottom - 10, lastPt.y - 12));
