@@ -12,13 +12,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0b0d13">
 
-  <!-- iPhone / Android アプリアイコン（JSで高精細PNGを直結） -->
+  <!-- iPhone / Android アプリアイコン -->
   <link rel="apple-touch-icon" id="apple-touch-icon">
   <link rel="apple-touch-icon-precomposed" id="apple-touch-icon-precomposed">
   <link rel="icon" type="image/png" id="favicon-icon">
-
-  <!-- Chart.js CDN (グラフ描画ライブラリ) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
@@ -221,12 +218,19 @@
     .plus-val { color: var(--accent-pink); }
     .minus-val { color: #60a5fa; }
 
-    /* グラフコンテナ */
-    .chart-wrapper {
-      position: relative;
-      height: 260px;
+    /* SVGグラフコンテナ */
+    .chart-box {
       width: 100%;
-      margin-top: 10px;
+      background: var(--card-sub);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px 8px;
+      overflow: hidden;
+    }
+    .svg-chart {
+      width: 100%;
+      height: 240px;
+      display: block;
     }
 
     /* 機種別/履歴テーブル */
@@ -362,11 +366,13 @@
         </div>
       </div>
 
-      <!-- 生涯収支推移グラフ -->
+      <!-- 生涯収支推移グラフ（外部ライブラリ非依存・SVGネイティブ描画） -->
       <div class="card">
         <div class="card-title">📈 生涯累計収支推移グラフ</div>
-        <div class="chart-wrapper">
-          <canvas id="profitChart"></canvas>
+        <div class="chart-box">
+          <svg id="profit-svg" class="svg-chart" viewBox="0 0 600 240">
+            <!-- JSで動的描画 -->
+          </svg>
         </div>
       </div>
 
@@ -442,18 +448,15 @@
 
   <script>
     // --- GOGO!ランプ PNGアイコンのCanvas生成と自動紐付け ---
-    // スマホが確実に認識できる正方形PNGデータURLを生成
     function createGogoPngDataUrl() {
       const canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 512;
       const ctx = canvas.getContext('2d');
 
-      // 背景 (黒)
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, 512, 512);
 
-      // 青色フラッシュスター
       ctx.save();
       const grad = ctx.createRadialGradient(256, 240, 20, 256, 240, 260);
       grad.addColorStop(0, '#38bdf8');
@@ -477,7 +480,6 @@
       ctx.fill();
       ctx.restore();
 
-      // GOGO! テキスト (傾き・ピンク・白縁)
       ctx.save();
       ctx.translate(256, 240);
       ctx.rotate(-16 * Math.PI / 180);
@@ -495,7 +497,6 @@
       ctx.fillText('GOGO!', 0, 0);
       ctx.restore();
 
-      // CHANCE テキスト (白・重厚)
       ctx.save();
       ctx.font = "900 94px 'Impact', 'Arial Black', sans-serif";
       ctx.textAlign = 'center';
@@ -510,13 +511,11 @@
 
     const gogoPngUrl = createGogoPngDataUrl();
 
-    // ヘッダーやPWAアイコンへの適用
     document.getElementById('gogo-header-img').src = gogoPngUrl;
     document.getElementById('apple-touch-icon').href = gogoPngUrl;
     document.getElementById('apple-touch-icon-precomposed').href = gogoPngUrl;
     document.getElementById('favicon-icon').href = gogoPngUrl;
 
-    // Web App Manifest を動的生成
     const manifestJson = {
       name: "ジャグラーデータ分析",
       short_name: "ジャグラー",
@@ -544,7 +543,7 @@
       if (banner) banner.style.display = 'none';
     }
 
-    // --- ジャグラー分析エンジン ---
+    // --- ジャグラー分析スペック ---
     const SPECS = {
       "マイジャグV": {
         bb: [273.1, 270.8, 266.4, 254.0, 240.1, 229.1],
@@ -736,9 +735,8 @@
       reader.readAsText(file);
     }
 
-    // --- 生涯収支 & グラフ描画 ---
+    // --- 生涯収支 & ネイティブSVGグラフ ---
     let battleRecords = JSON.parse(localStorage.getItem("juggler_records") || "[]");
-    let profitChartInstance = null;
 
     function saveRecords() {
       localStorage.setItem("juggler_records", JSON.stringify(battleRecords));
@@ -842,84 +840,128 @@
         rBody.appendChild(tr);
       });
 
-      // グラフの更新
-      renderProfitChart();
+      // SVGグラフ生成
+      drawNativeSvgGraph();
     }
 
-    // Chart.jsによる生涯収支グラフ描画
-    function renderProfitChart() {
-      const ctx = document.getElementById('profitChart')?.getContext('2d');
-      if (!ctx) return;
+    // --- 外部CDN不要の超軽量SVG折れ線グラフ描画 ---
+    function drawNativeSvgGraph() {
+      const svg = document.getElementById('profit-svg');
+      if (!svg) return;
 
-      // 日付昇順（過去から現在へ）に並べ替えて累計推移を計算
+      const W = 600;
+      const H = 240;
+      const padTop = 30;
+      const padBottom = 35;
+      const padLeft = 65;
+      const padRight = 30;
+
+      const plotW = W - padLeft - padRight;
+      const plotH = H - padTop - padBottom;
+
+      // 日付昇順（過去から現在）に累計を計算
       const chronological = [...battleRecords].reverse();
       let cumulative = 0;
-      const labels = ['スタート'];
       const dataPoints = [0];
+      const dates = ['START'];
 
-      chronological.forEach((rec, index) => {
+      chronological.forEach((rec, idx) => {
         cumulative += rec.profit;
-        labels.push(rec.date.slice(5) || `#${index + 1}`);
         dataPoints.push(cumulative);
+        dates.push(rec.date.slice(5) || `#${idx+1}`);
       });
 
-      if (profitChartInstance) {
-        profitChartInstance.destroy();
+      // 実戦データが0件の場合のプレースホルダー描画
+      if (battleRecords.length === 0) {
+        svg.innerHTML = `
+          <line x1="${padLeft}" y1="${H/2}" x2="${W-padRight}" y2="${H/2}" stroke="#374151" stroke-dasharray="4" />
+          <text x="${W/2}" y="${H/2 - 12}" fill="#6b7280" font-size="14" font-weight="700" text-anchor="middle">実戦記録を追加すると生涯収支グラフが表示されます</text>
+          <text x="${padLeft}" y="${H/2 + 4}" fill="#6b7280" font-size="11" text-anchor="end">0 円</text>
+        `;
+        return;
       }
 
-      const isPositive = cumulative >= 0;
-      const lineColor = isPositive ? '#ec4899' : '#38bdf8';
-      const areaColor = isPositive ? 'rgba(236, 72, 153, 0.15)' : 'rgba(56, 189, 248, 0.15)';
+      // Y軸の最大値・最小値
+      let maxVal = Math.max(...dataPoints);
+      let minVal = Math.min(...dataPoints);
 
-      profitChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: '累計収支 (円)',
-            data: dataPoints,
-            borderColor: lineColor,
-            backgroundColor: areaColor,
-            borderWidth: 3,
-            fill: true,
-            tension: 0.3,
-            pointRadius: dataPoints.length > 30 ? 0 : 4,
-            pointBackgroundColor: lineColor,
-            pointHoverRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const val = context.raw;
-                  return (val >= 0 ? '+' : '') + val.toLocaleString() + ' 円';
-                }
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: { color: 'rgba(255, 255, 255, 0.05)' },
-              ticks: { color: '#9ca3af', font: { size: 10 } }
-            },
-            y: {
-              grid: { color: 'rgba(255, 255, 255, 0.08)' },
-              ticks: {
-                color: '#9ca3af',
-                font: { size: 11 },
-                callback: function(value) {
-                  return (value >= 0 ? '+' : '') + (value / 1000) + 'k';
-                }
-              }
-            }
-          }
+      // 上下に余白を持たせる
+      if (maxVal === minVal) {
+        maxVal += 10000;
+        minVal -= 10000;
+      } else {
+        const span = maxVal - minVal;
+        maxVal += span * 0.15;
+        minVal -= span * 0.15;
+      }
+
+      // 0円ラインを必ず含める
+      if (minVal > 0) minVal = 0;
+      if (maxVal < 0) maxVal = 0;
+
+      const getY = (val) => padTop + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
+      const getX = (idx) => padLeft + (idx / (dataPoints.length - 1)) * plotW;
+
+      const zeroY = getY(0);
+
+      // 座標生成
+      const pts = dataPoints.map((val, idx) => ({ x: getX(idx), y: getY(val), val, date: dates[idx] }));
+      const pathD = pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
+      const areaD = `${pathD} L ${pts[pts.length-1].x} ${zeroY} L ${pts[0].x} ${zeroY} Z`;
+
+      const lastVal = dataPoints[dataPoints.length - 1];
+      const strokeColor = lastVal >= 0 ? '#ec4899' : '#38bdf8';
+      const fillColor = lastVal >= 0 ? 'rgba(236, 72, 153, 0.2)' : 'rgba(56, 189, 248, 0.2)';
+
+      // SVG構築
+      let svgHtml = `
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- グリッド線 & 基準線 (0円) -->
+        <line x1="${padLeft}" y1="${getY(maxVal)}" x2="${W-padRight}" y2="${getY(maxVal)}" stroke="#1f293d" stroke-width="1"/>
+        <line x1="${padLeft}" y1="${getY(minVal)}" x2="${W-padRight}" y2="${getY(minVal)}" stroke="#1f293d" stroke-width="1"/>
+        <line x1="${padLeft}" y1="${zeroY}" x2="${W-padRight}" y2="${zeroY}" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+        <!-- Y軸目盛 -->
+        <text x="${padLeft - 8}" y="${getY(maxVal) + 4}" fill="#9ca3af" font-size="10" text-anchor="end">${Math.round(maxVal).toLocaleString()}</text>
+        <text x="${padLeft - 8}" y="${zeroY + 4}" fill="#9ca3af" font-size="10" font-weight="700" text-anchor="end">0</text>
+        <text x="${padLeft - 8}" y="${getY(minVal) + 4}" fill="#9ca3af" font-size="10" text-anchor="end">${Math.round(minVal).toLocaleString()}</text>
+
+        <!-- 塗りつぶし領域 -->
+        <path d="${areaD}" fill="url(#areaGrad)" />
+
+        <!-- メイン折れ線 -->
+        <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      `;
+
+      // ポイント点と最終収支ラベル
+      pts.forEach((p, i) => {
+        if (pts.length <= 25 || i === 0 || i === pts.length - 1) {
+          svgHtml += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${strokeColor}" stroke="#ffffff" stroke-width="1.5"/>`;
         }
       });
+
+      // 最終累計値バッジ
+      const lastPt = pts[pts.length - 1];
+      const badgeText = `${lastVal >= 0 ? '+' : ''}${lastVal.toLocaleString()}円`;
+      const badgeY = Math.max(padTop + 14, Math.min(H - padBottom - 10, lastPt.y - 12));
+      svgHtml += `
+        <rect x="${lastPt.x - 70}" y="${badgeY - 14}" width="75" height="20" rx="4" fill="#1e2230" stroke="${strokeColor}" stroke-width="1"/>
+        <text x="${lastPt.x - 32}" y="${badgeY}" fill="${strokeColor}" font-size="11" font-weight="800" text-anchor="middle">${badgeText}</text>
+      `;
+
+      // X軸日付ラベル（開始日と最新日）
+      svgHtml += `
+        <text x="${padLeft}" y="${H - 10}" fill="#9ca3af" font-size="10" text-anchor="start">${pts[0].date}</text>
+        <text x="${W - padRight}" y="${H - 10}" fill="#9ca3af" font-size="10" text-anchor="end">${pts[pts.length-1].date}</text>
+      `;
+
+      svg.innerHTML = svgHtml;
     }
 
     function switchTab(tabId, btn) {
@@ -930,7 +972,7 @@
       document.getElementById(tabId).classList.add('active');
 
       if (tabId === 'lifetime-tab') {
-        setTimeout(renderProfitChart, 50);
+        drawNativeSvgGraph();
       }
     }
 
