@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ジャグラー分析</title>
 
-  <!-- Webアプリ・PWAメタタグ設定 (フルスクリーン表示対応) -->
+  <!-- モバイルPWA・フルスクリーン対応 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ジャグラー分析">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0b0d13">
 
-  <!-- iPhone / iPad ホーム画面用アプリアイコン (Base64埋め込み) -->
+  <!-- iPhone / Android アプリアイコン（JSで高精細PNGを直結） -->
   <link rel="apple-touch-icon" id="apple-touch-icon">
-  <link rel="icon" id="favicon-icon">
+  <link rel="apple-touch-icon-precomposed" id="apple-touch-icon-precomposed">
+  <link rel="icon" type="image/png" id="favicon-icon">
 
-  <!-- Web App Manifest (動的生成リンク) -->
-  <link rel="manifest" id="manifest-link">
+  <!-- Chart.js CDN (グラフ描画ライブラリ) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
@@ -70,7 +71,7 @@
       overflow: hidden;
       background: #000;
       border: 1.5px solid #3b82f6;
-      box-shadow: 0 0 14px rgba(59, 130, 246, 0.6), inset 0 0 8px rgba(236, 72, 153, 0.4);
+      box-shadow: 0 0 14px rgba(59, 130, 246, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -97,7 +98,7 @@
       padding: 16px;
     }
 
-    /* PWAインストールガイドバナー（未インストール時用） */
+    /* PWA案内バナー */
     .pwa-guide {
       background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
       border: 1px solid rgba(139, 92, 246, 0.4);
@@ -111,7 +112,7 @@
       justify-content: space-between;
     }
 
-    /* タブ切り替え */
+    /* タブ */
     .tabs {
       display: flex;
       background: var(--card-bg);
@@ -131,7 +132,6 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.2s ease;
       text-align: center;
     }
     .tab-btn.active {
@@ -143,14 +143,13 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    /* カードUI */
+    /* カード */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 16px;
       padding: 18px;
       margin-bottom: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
     .card-title {
       font-size: 1rem;
@@ -159,17 +158,15 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      color: var(--text-main);
     }
 
-    /* ファイル取り込みゾーン */
+    /* ドロップゾーン */
     .drop-zone {
       border: 2px dashed #4b5563;
       border-radius: 12px;
       padding: 24px 16px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s ease;
       background: rgba(255, 255, 255, 0.02);
     }
     .drop-zone:active {
@@ -178,16 +175,14 @@
     }
     .drop-zone p { color: var(--text-sub); font-size: 0.85rem; margin-top: 6px; }
 
-    /* 設定推測一覧テーブル */
+    /* テーブル表示 */
     .table-container {
       overflow-x: auto;
       border-radius: 12px;
-      -webkit-overflow-scrolling: touch;
     }
     table.analysis-table {
       width: 100%;
       border-collapse: collapse;
-      text-align: left;
       font-size: 0.95rem;
     }
     table.analysis-table th {
@@ -203,25 +198,10 @@
       white-space: nowrap;
     }
 
-    .badge-prob {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: #38bdf8;
-    }
-    .badge-prob.high {
-      color: #f43f5e;
-      text-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
-    }
-    .badge-prob.mid {
-      color: #fbbf24;
-    }
-
-    .rank-text {
-      font-family: monospace;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      color: #e5e7eb;
-    }
+    .badge-prob { font-weight: 700; color: #38bdf8; }
+    .badge-prob.high { color: #f43f5e; text-shadow: 0 0 10px rgba(244, 63, 94, 0.4); }
+    .badge-prob.mid { color: #fbbf24; }
+    .rank-text { font-family: monospace; font-weight: 700; color: #e5e7eb; }
 
     /* 統計サマリー */
     .stats-grid {
@@ -237,15 +217,19 @@
       padding: 14px 10px;
       text-align: center;
     }
-    .stat-card .val {
-      font-size: 1.4rem;
-      font-weight: 800;
-      margin-top: 4px;
-    }
+    .stat-card .val { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
     .plus-val { color: var(--accent-pink); }
     .minus-val { color: #60a5fa; }
 
-    /* 機種別テーブル */
+    /* グラフコンテナ */
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    /* 機種別/履歴テーブル */
     .sub-table {
       width: 100%;
       border-collapse: collapse;
@@ -258,7 +242,7 @@
     }
     .sub-table th:first-child, .sub-table td:first-child { text-align: left; }
 
-    /* フォームスタイル */
+    /* フォーム */
     .form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -269,11 +253,7 @@
       flex-direction: column;
       gap: 5px;
     }
-    label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-sub);
-    }
+    label { font-size: 0.75rem; font-weight: 600; color: var(--text-sub); }
     input, select {
       background: var(--card-sub);
       border: 1px solid var(--border-color);
@@ -283,9 +263,6 @@
       font-size: 0.9rem;
       outline: none;
     }
-    input:focus, select:focus {
-      border-color: var(--accent-purple);
-    }
     .btn-primary {
       background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
       color: #fff;
@@ -293,17 +270,12 @@
       border: none;
       border-radius: 8px;
       padding: 12px 20px;
-      cursor: pointer;
       width: 100%;
       margin-top: 14px;
+      cursor: pointer;
     }
 
-    .notice-text {
-      font-size: 0.75rem;
-      color: var(--text-sub);
-      line-height: 1.4;
-      margin-top: 12px;
-    }
+    .notice-text { font-size: 0.75rem; color: var(--text-sub); margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -312,38 +284,36 @@
   <header>
     <div class="header-left">
       <div class="gogo-lamp-wrapper">
-        <img id="gogo-header-img" alt="GOGO! CHANCE">
+        <img id="gogo-header-img" alt="GOGO!">
       </div>
       <h1>JUGGLER ANALYZER</h1>
     </div>
   </header>
 
   <div class="container">
-    <!-- スマホホーム画面追加ガイド -->
     <div class="pwa-guide" id="pwa-banner">
       <span>📲 <strong>アプリ化手順:</strong> 共有メニュー ➔「ホーム画面に追加」</span>
       <button onclick="document.getElementById('pwa-banner').style.display='none'" style="background:none;border:none;color:#9ca3af;font-size:1.1rem;cursor:pointer;">✕</button>
     </div>
 
-    <!-- 2タブ構成 -->
+    <!-- タブ切り替え -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('analysis-tab', this)">📊 設定4以上推測</button>
       <button class="tab-btn" onclick="switchTab('lifetime-tab', this)">💰 生涯収支・勝率</button>
     </div>
 
-    <!-- 1. 設定4以上推測タブ -->
+    <!-- 1. 設定推測分析タブ -->
     <div id="analysis-tab" class="tab-content active">
       <div class="card">
         <div class="card-title">📁 ホール保存ファイル (MHTML / HTML) 読込</div>
         <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
           <span style="font-size: 2.2rem;">📥</span>
-          <p>保存した <strong>.mht / .mhtml / .html</strong> を選択<br>またはここにファイルをドロップ</p>
+          <p>保存した <strong>.mht / .mhtml / .html</strong> を選択<br>またはここにドロップ</p>
           <input type="file" id="file-input" accept=".mhtml,.mht,.html,.htm,.txt" style="display: none;">
         </div>
         <div id="file-status" style="margin-top: 8px; font-size: 0.85rem; color: var(--accent-green); text-align: center; font-weight: 600;"></div>
       </div>
 
-      <!-- 分析結果表示カード -->
       <div class="card">
         <div class="card-title" style="justify-content: space-between;">
           <span>設定4以上台一覧（番号順）</span>
@@ -364,9 +334,7 @@
                 <th>合算</th>
               </tr>
             </thead>
-            <tbody id="analysis-tbody">
-              <!-- JSで生成 -->
-            </tbody>
+            <tbody id="analysis-tbody"></tbody>
           </table>
         </div>
         <p class="notice-text">
@@ -377,6 +345,7 @@
 
     <!-- 2. 生涯収支・勝率タブ -->
     <div id="lifetime-tab" class="tab-content">
+      <!-- 統計サマリー -->
       <div class="stats-grid">
         <div class="stat-card">
           <div style="font-size: 0.75rem; color: var(--text-sub);">生涯総収支</div>
@@ -393,6 +362,14 @@
         </div>
       </div>
 
+      <!-- 生涯収支推移グラフ -->
+      <div class="card">
+        <div class="card-title">📈 生涯累計収支推移グラフ</div>
+        <div class="chart-wrapper">
+          <canvas id="profitChart"></canvas>
+        </div>
+      </div>
+
       <!-- 機種別勝率テーブル -->
       <div class="card">
         <div class="card-title">🎰 機種別 勝率・戦績内訳</div>
@@ -406,9 +383,7 @@
               <th>合計収支</th>
             </tr>
           </thead>
-          <tbody id="machine-stats-tbody">
-            <!-- JSで生成 -->
-          </tbody>
+          <tbody id="machine-stats-tbody"></tbody>
         </table>
       </div>
 
@@ -459,53 +434,90 @@
               <th>操作</th>
             </tr>
           </thead>
-          <tbody id="record-list-tbody">
-            <!-- 履歴 -->
-          </tbody>
+          <tbody id="record-list-tbody"></tbody>
         </table>
       </div>
     </div>
   </div>
 
   <script>
-    // --- GOGO! CHANCE アイコン（SVG高精細ベクター完全埋め込み） ---
-    // 外部ファイル不要でホーム画面アイコン・ヘッダーアイコン・ファビコンとして完全動作
-    const GOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-      <defs>
-        <radialGradient id="flashGlow" cx="48%" cy="46%" r="52%">
-          <stop offset="0%" stop-color="#40c4ff"/>
-          <stop offset="38%" stop-color="#0066ff"/>
-          <stop offset="72%" stop-color="#0022aa"/>
-          <stop offset="100%" stop-color="#000833"/>
-        </radialGradient>
-        <radialGradient id="pinkGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ffb3d9"/>
-          <stop offset="60%" stop-color="#ff3399"/>
-          <stop offset="100%" stop-color="#cc0066"/>
-        </radialGradient>
-      </defs>
-      <rect width="512" height="512" fill="#000000"/>
-      <!-- 発光フラッシュスター -->
-      <polygon points="256,60 286,180 376,96 332,204 456,150 378,242 492,268 376,298 466,380 338,348 360,460 270,372 230,470 206,356 120,446 156,336 42,390 120,296 20,260 134,234 50,154 176,192 144,80 230,172" fill="url(#flashGlow)"/>
-      <!-- GOGO! テキスト -->
-      <g transform="translate(256,236) rotate(-16) translate(-256,-236)">
-        <text x="256" y="270" text-anchor="middle" font-family="'Impact', 'Arial Black', sans-serif" font-size="115" font-weight="900" fill="url(#pinkGlow)" stroke="#ffffff" stroke-width="8" stroke-linejoin="round" letter-spacing="3">GOGO!</text>
-      </g>
-      <!-- CHANCE テキスト -->
-      <g transform="translate(256,410)">
-        <text x="0" y="0" text-anchor="middle" font-family="'Impact', 'Arial Black', sans-serif" font-size="96" font-weight="900" fill="#ffffff" letter-spacing="4">CHANCE</text>
-      </g>
-    </svg>`;
+    // --- GOGO!ランプ PNGアイコンのCanvas生成と自動紐付け ---
+    // スマホが確実に認識できる正方形PNGデータURLを生成
+    function createGogoPngDataUrl() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
 
-    const GOGO_DATA_URL = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(GOGO_SVG)));
+      // 背景 (黒)
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, 512, 512);
 
-    // アプリアイコン＆ファビコンの適用
-    document.getElementById('gogo-header-img').src = GOGO_DATA_URL;
-    document.getElementById('apple-touch-icon').href = GOGO_DATA_URL;
-    document.getElementById('favicon-icon').href = GOGO_DATA_URL;
+      // 青色フラッシュスター
+      ctx.save();
+      const grad = ctx.createRadialGradient(256, 240, 20, 256, 240, 260);
+      grad.addColorStop(0, '#38bdf8');
+      grad.addColorStop(0.35, '#0284c7');
+      grad.addColorStop(0.7, '#0033aa');
+      grad.addColorStop(1, '#000833');
+      ctx.fillStyle = grad;
 
-    // Web App Manifest を動的生成してPWA化
-    const manifestBlob = new Blob([JSON.stringify({
+      const pts = [
+        [256,50],[286,170],[380,86],[336,196],[464,142],[384,236],
+        [502,264],[384,296],[476,380],[346,346],[368,464],[274,372],
+        [230,474],[206,356],[114,452],[152,336],[34,394],[114,296],
+        [10,258],[128,230],[42,148],[172,188],[138,72],[226,168]
+      ];
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i][0], pts[i][1]);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // GOGO! テキスト (傾き・ピンク・白縁)
+      ctx.save();
+      ctx.translate(256, 240);
+      ctx.rotate(-16 * Math.PI / 180);
+      ctx.font = "900 115px 'Impact', 'Arial Black', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeText('GOGO!', 0, 0);
+      const textGrad = ctx.createLinearGradient(0, -60, 0, 60);
+      textGrad.addColorStop(0, '#fbcfe8');
+      textGrad.addColorStop(0.5, '#f43f5e');
+      textGrad.addColorStop(1, '#e11d48');
+      ctx.fillStyle = textGrad;
+      ctx.fillText('GOGO!', 0, 0);
+      ctx.restore();
+
+      // CHANCE テキスト (白・重厚)
+      ctx.save();
+      ctx.font = "900 94px 'Impact', 'Arial Black', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.letterSpacing = '4px';
+      ctx.fillText('CHANCE', 256, 410);
+      ctx.restore();
+
+      return canvas.toDataURL('image/png');
+    }
+
+    const gogoPngUrl = createGogoPngDataUrl();
+
+    // ヘッダーやPWAアイコンへの適用
+    document.getElementById('gogo-header-img').src = gogoPngUrl;
+    document.getElementById('apple-touch-icon').href = gogoPngUrl;
+    document.getElementById('apple-touch-icon-precomposed').href = gogoPngUrl;
+    document.getElementById('favicon-icon').href = gogoPngUrl;
+
+    // Web App Manifest を動的生成
+    const manifestJson = {
       name: "ジャグラーデータ分析",
       short_name: "ジャグラー",
       start_url: "./",
@@ -514,16 +526,19 @@
       theme_color: "#0b0d13",
       icons: [
         {
-          src: GOGO_DATA_URL,
+          src: gogoPngUrl,
           sizes: "512x512",
-          type: "image/svg+xml",
+          type: "image/png",
           purpose: "any maskable"
         }
       ]
-    })], { type: 'application/json' });
-    document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifestJson)], { type: 'application/json' });
+    const manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = URL.createObjectURL(manifestBlob);
+    document.head.appendChild(manifestLink);
 
-    // すでにPWAとしてスタンドアローン起動している場合はインストール案内を非表示
     if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
       const banner = document.getElementById('pwa-banner');
       if (banner) banner.style.display = 'none';
@@ -721,8 +736,9 @@
       reader.readAsText(file);
     }
 
-    // --- 生涯収支 & 勝率 ---
+    // --- 生涯収支 & グラフ描画 ---
     let battleRecords = JSON.parse(localStorage.getItem("juggler_records") || "[]");
+    let profitChartInstance = null;
 
     function saveRecords() {
       localStorage.setItem("juggler_records", JSON.stringify(battleRecords));
@@ -789,6 +805,7 @@
       document.getElementById("win-count").innerText = `${wins}勝 ${losses}敗 ${draws}分`;
       document.getElementById("total-battles").innerText = `${totalBattles} 回`;
 
+      // 機種別テーブル
       const mBody = document.getElementById("machine-stats-tbody");
       mBody.innerHTML = "";
       Object.keys(machineMap).forEach(mName => {
@@ -807,6 +824,7 @@
         mBody.appendChild(tr);
       });
 
+      // 履歴一覧
       const rBody = document.getElementById("record-list-tbody");
       rBody.innerHTML = "";
       battleRecords.forEach(r => {
@@ -823,6 +841,85 @@
         `;
         rBody.appendChild(tr);
       });
+
+      // グラフの更新
+      renderProfitChart();
+    }
+
+    // Chart.jsによる生涯収支グラフ描画
+    function renderProfitChart() {
+      const ctx = document.getElementById('profitChart')?.getContext('2d');
+      if (!ctx) return;
+
+      // 日付昇順（過去から現在へ）に並べ替えて累計推移を計算
+      const chronological = [...battleRecords].reverse();
+      let cumulative = 0;
+      const labels = ['スタート'];
+      const dataPoints = [0];
+
+      chronological.forEach((rec, index) => {
+        cumulative += rec.profit;
+        labels.push(rec.date.slice(5) || `#${index + 1}`);
+        dataPoints.push(cumulative);
+      });
+
+      if (profitChartInstance) {
+        profitChartInstance.destroy();
+      }
+
+      const isPositive = cumulative >= 0;
+      const lineColor = isPositive ? '#ec4899' : '#38bdf8';
+      const areaColor = isPositive ? 'rgba(236, 72, 153, 0.15)' : 'rgba(56, 189, 248, 0.15)';
+
+      profitChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '累計収支 (円)',
+            data: dataPoints,
+            borderColor: lineColor,
+            backgroundColor: areaColor,
+            borderWidth: 3,
+            fill: true,
+            tension: 0.3,
+            pointRadius: dataPoints.length > 30 ? 0 : 4,
+            pointBackgroundColor: lineColor,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const val = context.raw;
+                  return (val >= 0 ? '+' : '') + val.toLocaleString() + ' 円';
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#9ca3af', font: { size: 10 } }
+            },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.08)' },
+              ticks: {
+                color: '#9ca3af',
+                font: { size: 11 },
+                callback: function(value) {
+                  return (value >= 0 ? '+' : '') + (value / 1000) + 'k';
+                }
+              }
+            }
+          }
+        }
+      });
     }
 
     function switchTab(tabId, btn) {
@@ -831,6 +928,10 @@
 
       btn.classList.add('active');
       document.getElementById(tabId).classList.add('active');
+
+      if (tabId === 'lifetime-tab') {
+        setTimeout(renderProfitChart, 50);
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
