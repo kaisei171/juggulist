@@ -43,7 +43,6 @@
       user-select: none;
     }
 
-    /* ヘッダーバナー */
     header {
       background: linear-gradient(135deg, #181428 0%, #0d111a 100%);
       border-bottom: 1px solid var(--border-color);
@@ -95,7 +94,6 @@
       padding: 16px;
     }
 
-    /* PWA案内バナー */
     .pwa-guide {
       background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
       border: 1px solid rgba(139, 92, 246, 0.4);
@@ -109,7 +107,6 @@
       justify-content: space-between;
     }
 
-    /* タブ */
     .tabs {
       display: flex;
       background: var(--card-bg);
@@ -140,7 +137,6 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    /* カード */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -157,7 +153,6 @@
       gap: 8px;
     }
 
-    /* ドロップゾーン */
     .drop-zone {
       border: 2px dashed #4b5563;
       border-radius: 12px;
@@ -172,7 +167,6 @@
     }
     .drop-zone p { color: var(--text-sub); font-size: 0.85rem; margin-top: 6px; }
 
-    /* テーブル表示 */
     .table-container {
       overflow-x: auto;
       border-radius: 12px;
@@ -200,7 +194,6 @@
     .badge-prob.mid { color: #fbbf24; }
     .rank-text { font-family: monospace; font-weight: 700; color: #e5e7eb; }
 
-    /* 統計サマリー */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -218,7 +211,6 @@
     .plus-val { color: var(--accent-pink); }
     .minus-val { color: #60a5fa; }
 
-    /* SVGグラフコンテナ */
     .chart-box {
       width: 100%;
       background: var(--card-sub);
@@ -229,11 +221,10 @@
     }
     .svg-chart {
       width: 100%;
-      height: 240px;
+      height: 250px;
       display: block;
     }
 
-    /* 機種別/履歴テーブル */
     .sub-table {
       width: 100%;
       border-collapse: collapse;
@@ -246,7 +237,6 @@
     }
     .sub-table th:first-child, .sub-table td:first-child { text-align: left; }
 
-    /* フォーム */
     .form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -278,13 +268,11 @@
       margin-top: 14px;
       cursor: pointer;
     }
-
     .notice-text { font-size: 0.75rem; color: var(--text-sub); margin-top: 12px; }
   </style>
 </head>
 <body>
 
-  <!-- バナー -->
   <header>
     <div class="header-left">
       <div class="gogo-lamp-wrapper">
@@ -300,7 +288,6 @@
       <button onclick="document.getElementById('pwa-banner').style.display='none'" style="background:none;border:none;color:#9ca3af;font-size:1.1rem;cursor:pointer;">✕</button>
     </div>
 
-    <!-- タブ切り替え -->
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('analysis-tab', this)">📊 設定4以上推測</button>
       <button class="tab-btn" onclick="switchTab('lifetime-tab', this)">💰 生涯収支・勝率</button>
@@ -349,7 +336,6 @@
 
     <!-- 2. 生涯収支・勝率タブ -->
     <div id="lifetime-tab" class="tab-content">
-      <!-- 統計サマリー -->
       <div class="stats-grid">
         <div class="stat-card">
           <div style="font-size: 0.75rem; color: var(--text-sub);">生涯総収支</div>
@@ -366,11 +352,14 @@
         </div>
       </div>
 
-      <!-- 生涯収支推移グラフ（外部ライブラリ非依存・SVGネイティブ描画） -->
+      <!-- 生涯収支日別推移グラフ -->
       <div class="card">
-        <div class="card-title">📈 生涯累計収支推移グラフ</div>
+        <div class="card-title" style="justify-content: space-between;">
+          <span>📈 生涯累計収支推移（日付別）</span>
+          <span id="chart-subtext" style="font-size: 0.75rem; color: var(--text-sub);">同日の複数台は合算</span>
+        </div>
         <div class="chart-box">
-          <svg id="profit-svg" class="svg-chart" viewBox="0 0 600 240">
+          <svg id="profit-svg" class="svg-chart" viewBox="0 0 600 250">
             <!-- JSで動的描画 -->
           </svg>
         </div>
@@ -735,7 +724,7 @@
       reader.readAsText(file);
     }
 
-    // --- 生涯収支 & ネイティブSVGグラフ ---
+    // --- 生涯収支 & 日付別プロットSVGグラフ ---
     let battleRecords = JSON.parse(localStorage.getItem("juggler_records") || "[]");
 
     function saveRecords() {
@@ -803,7 +792,6 @@
       document.getElementById("win-count").innerText = `${wins}勝 ${losses}敗 ${draws}分`;
       document.getElementById("total-battles").innerText = `${totalBattles} 回`;
 
-      // 機種別テーブル
       const mBody = document.getElementById("machine-stats-tbody");
       mBody.innerHTML = "";
       Object.keys(machineMap).forEach(mName => {
@@ -822,7 +810,6 @@
         mBody.appendChild(tr);
       });
 
-      // 履歴一覧
       const rBody = document.getElementById("record-list-tbody");
       rBody.innerHTML = "";
       battleRecords.forEach(r => {
@@ -840,89 +827,113 @@
         rBody.appendChild(tr);
       });
 
-      // SVGグラフ生成
       drawNativeSvgGraph();
     }
 
-    // --- 外部CDN不要の超軽量SVG折れ線グラフ描画 ---
+    // --- 日付単位集計による生涯累計収支SVGグラフ描画 ---
     function drawNativeSvgGraph() {
       const svg = document.getElementById('profit-svg');
       if (!svg) return;
 
       const W = 600;
-      const H = 240;
-      const padTop = 30;
-      const padBottom = 35;
-      const padLeft = 65;
-      const padRight = 30;
+      const H = 250;
+      const padTop = 32;
+      const padBottom = 42;
+      const padLeft = 68;
+      const padRight = 32;
 
       const plotW = W - padLeft - padRight;
       const plotH = H - padTop - padBottom;
 
-      // 日付昇順（過去から現在）に累計を計算
-      const chronological = [...battleRecords].reverse();
-      let cumulative = 0;
-      const dataPoints = [0];
-      const dates = ['START'];
-
-      chronological.forEach((rec, idx) => {
-        cumulative += rec.profit;
-        dataPoints.push(cumulative);
-        dates.push(rec.date.slice(5) || `#${idx+1}`);
-      });
-
-      // 実戦データが0件の場合のプレースホルダー描画
       if (battleRecords.length === 0) {
         svg.innerHTML = `
           <line x1="${padLeft}" y1="${H/2}" x2="${W-padRight}" y2="${H/2}" stroke="#374151" stroke-dasharray="4" />
-          <text x="${W/2}" y="${H/2 - 12}" fill="#6b7280" font-size="14" font-weight="700" text-anchor="middle">実戦記録を追加すると生涯収支グラフが表示されます</text>
+          <text x="${W/2}" y="${H/2 - 12}" fill="#6b7280" font-size="14" font-weight="700" text-anchor="middle">実戦記録を追加すると日付別グラフが表示されます</text>
           <text x="${padLeft}" y="${H/2 + 4}" fill="#6b7280" font-size="11" text-anchor="end">0 円</text>
         `;
         return;
       }
 
-      // Y軸の最大値・最小値
+      // 1. 日付ごとに収支を合算集計（同日複数台を1つに統合）
+      const dailyMap = {};
+      battleRecords.forEach(r => {
+        const dateKey = r.date;
+        if (!dailyMap[dateKey]) {
+          dailyMap[dateKey] = 0;
+        }
+        dailyMap[dateKey] += r.profit;
+      });
+
+      // 2. 日付を昇順ソート（過去から現在へ）
+      const sortedDates = Object.keys(dailyMap).sort();
+
+      // 3. 累計収支推移ポイントの生成
+      let cumulative = 0;
+      const dataPoints = [0]; // 初期地点 (0円)
+      const dateLabels = ['START'];
+
+      sortedDates.forEach(date => {
+        cumulative += dailyMap[date];
+        dataPoints.push(cumulative);
+        dateLabels.push(date.slice(5)); // 'YYYY-MM-DD' から 'MM-DD' を抽出
+      });
+
       let maxVal = Math.max(...dataPoints);
       let minVal = Math.min(...dataPoints);
 
-      // 上下に余白を持たせる
       if (maxVal === minVal) {
         maxVal += 10000;
         minVal -= 10000;
       } else {
         const span = maxVal - minVal;
-        maxVal += span * 0.15;
-        minVal -= span * 0.15;
+        maxVal += span * 0.18;
+        minVal -= span * 0.18;
       }
 
-      // 0円ラインを必ず含める
       if (minVal > 0) minVal = 0;
       if (maxVal < 0) maxVal = 0;
 
       const getY = (val) => padTop + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
       const getX = (idx) => padLeft + (idx / (dataPoints.length - 1)) * plotW;
-
       const zeroY = getY(0);
 
-      // 座標生成
-      const pts = dataPoints.map((val, idx) => ({ x: getX(idx), y: getY(val), val, date: dates[idx] }));
+      const pts = dataPoints.map((val, idx) => ({
+        x: getX(idx),
+        y: getY(val),
+        val,
+        label: dateLabels[idx]
+      }));
+
       const pathD = pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
       const areaD = `${pathD} L ${pts[pts.length-1].x} ${zeroY} L ${pts[0].x} ${zeroY} Z`;
 
       const lastVal = dataPoints[dataPoints.length - 1];
       const strokeColor = lastVal >= 0 ? '#ec4899' : '#38bdf8';
-      const fillColor = lastVal >= 0 ? 'rgba(236, 72, 153, 0.2)' : 'rgba(56, 189, 248, 0.2)';
 
-      // SVG構築
+      // X軸の日付ラベル間引き間隔（プロット数が多い場合の重なり防止）
+      const totalPoints = pts.length;
+      let labelStep = 1;
+      if (totalPoints > 15) labelStep = Math.ceil(totalPoints / 8);
+
+      let xLabelsSvg = '';
+      pts.forEach((p, i) => {
+        if (i === 0 || i === totalPoints - 1 || i % labelStep === 0) {
+          xLabelsSvg += `
+            <text x="${p.x}" y="${H - 12}" fill="#9ca3af" font-size="10.5" font-weight="600" text-anchor="middle">${p.label}</text>
+            <line x1="${p.x}" y1="${H - 28}" x2="${p.x}" y2="${H - 32}" stroke="#4b5563" stroke-width="1"/>
+          `;
+        }
+      });
+
       let svgHtml = `
         <defs>
           <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
+            <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.32"/>
             <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0.0"/>
           </linearGradient>
         </defs>
 
-        <!-- グリッド線 & 基準線 (0円) -->
+        <!-- 補助線 & 基準線 (0円) -->
         <line x1="${padLeft}" y1="${getY(maxVal)}" x2="${W-padRight}" y2="${getY(maxVal)}" stroke="#1f293d" stroke-width="1"/>
         <line x1="${padLeft}" y1="${getY(minVal)}" x2="${W-padRight}" y2="${getY(minVal)}" stroke="#1f293d" stroke-width="1"/>
         <line x1="${padLeft}" y1="${zeroY}" x2="${W-padRight}" y2="${zeroY}" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 3"/>
@@ -932,17 +943,21 @@
         <text x="${padLeft - 8}" y="${zeroY + 4}" fill="#9ca3af" font-size="10" font-weight="700" text-anchor="end">0</text>
         <text x="${padLeft - 8}" y="${getY(minVal) + 4}" fill="#9ca3af" font-size="10" text-anchor="end">${Math.round(minVal).toLocaleString()}</text>
 
+        <!-- X軸底辺ライン -->
+        <line x1="${padLeft}" y1="${H - 32}" x2="${W-padRight}" y2="${H - 32}" stroke="#374151" stroke-width="1"/>
+        ${xLabelsSvg}
+
         <!-- 塗りつぶし領域 -->
         <path d="${areaD}" fill="url(#areaGrad)" />
 
-        <!-- メイン折れ線 -->
+        <!-- 折れ線 -->
         <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
       `;
 
-      // ポイント点と最終収支ラベル
+      // ポイント点
       pts.forEach((p, i) => {
-        if (pts.length <= 25 || i === 0 || i === pts.length - 1) {
-          svgHtml += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${strokeColor}" stroke="#ffffff" stroke-width="1.5"/>`;
+        if (pts.length <= 30 || i === 0 || i === pts.length - 1) {
+          svgHtml += `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${strokeColor}" stroke="#ffffff" stroke-width="1.5"/>`;
         }
       });
 
@@ -951,14 +966,8 @@
       const badgeText = `${lastVal >= 0 ? '+' : ''}${lastVal.toLocaleString()}円`;
       const badgeY = Math.max(padTop + 14, Math.min(H - padBottom - 10, lastPt.y - 12));
       svgHtml += `
-        <rect x="${lastPt.x - 70}" y="${badgeY - 14}" width="75" height="20" rx="4" fill="#1e2230" stroke="${strokeColor}" stroke-width="1"/>
-        <text x="${lastPt.x - 32}" y="${badgeY}" fill="${strokeColor}" font-size="11" font-weight="800" text-anchor="middle">${badgeText}</text>
-      `;
-
-      // X軸日付ラベル（開始日と最新日）
-      svgHtml += `
-        <text x="${padLeft}" y="${H - 10}" fill="#9ca3af" font-size="10" text-anchor="start">${pts[0].date}</text>
-        <text x="${W - padRight}" y="${H - 10}" fill="#9ca3af" font-size="10" text-anchor="end">${pts[pts.length-1].date}</text>
+        <rect x="${lastPt.x - 72}" y="${badgeY - 14}" width="76" height="20" rx="4" fill="#1e2230" stroke="${strokeColor}" stroke-width="1"/>
+        <text x="${lastPt.x - 34}" y="${badgeY}" fill="${strokeColor}" font-size="11" font-weight="800" text-anchor="middle">${badgeText}</text>
       `;
 
       svg.innerHTML = svgHtml;
